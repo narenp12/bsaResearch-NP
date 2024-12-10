@@ -1,0 +1,107 @@
+---
+title: "BSA Football initial models"
+author: "Naren Prakash"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(univariateML)
+library(tidyverse)
+library(class)
+library(GGally)
+library(MASS)
+library(e1071)
+library(glmnet)
+library(boot)
+library(crossval)
+library(caret)
+library(naniar)
+library(mice)
+library(randomForest)
+library(missForest)
+library(mltools)
+library(xgboost)
+library(data.table)
+library(doParallel)
+library(mixgb)
+library(tidymodels)
+library(finetune)
+library(DataExplorer)
+
+registerDoParallel(cores = parallel::detectCores())
+```
+
+```{r}
+library(janitor)
+
+pbp_2018 <- clean_names(read_csv("pbp_merged_2018.csv"))
+pbp_2019 <- clean_names(read_csv("pbp_merged_2019.csv"))
+pbp_2020 <- clean_names(read_csv("pbp_merged_2020.csv"))
+pbp_2021 <- clean_names(read_csv("pbp_merged_2021.csv"))
+pbp_2022 <- clean_names(read_csv("pbp_merged_2022.csv"))
+pbp_2023 <- clean_names(read_csv("pbp_merged_2023.csv"))
+```
+
+```{r}
+full <- pbp_2018 %>% full_join(pbp_2019) %>% full_join(pbp_2020) %>% full_join(pbp_2021) %>% full_join(pbp_2022) %>% full_join(pbp_2023)
+
+trainIndex <- createDataPartition(full$route, p = 0.7, list = FALSE)
+
+train <- full[trainIndex, ]
+test <- full[-trainIndex, ]
+
+train <- subset(train, select = -c(run_gap, run_location, yards_after_catch, x1, unnamed_0_pbp,play_id, old_game_id, unnamed_0_pbp_part, nflverse_game_id))
+train <- train %>%
+  mutate_if(is.character, as.factor) %>% 
+  dplyr::select(where(~ !any(is.na(.))))
+```
+```{r}
+test <- subset(test, select = -c(run_gap, run_location, yards_after_catch, x1, unnamed_0_pbp,play_id, old_game_id, unnamed_0_pbp_part, nflverse_game_id))
+test <- test %>%
+  mutate_if(is.character, as.factor) %>% 
+  dplyr::select(where(~ !any(is.na(.))))
+```
+```{r}
+nb <- naiveBayes(route ~ ., data = train)
+
+y_pred <- predict(nb, newdata = test)
+
+confusionMatrix(y_pred, test$route)
+```
+
+```{r}
+library(h2o)
+
+# Initialize the H2O cluster
+h2o.init()
+
+# Convert the training dataset to an H2O frame
+imputed_h2 <- as.h2o(train)
+
+# Define the AutoML settings, limiting to tree-based models
+automl <- h2o.automl(
+  y = "route",                    # Response variable
+  training_frame = imputed_h2,     # Training dataset
+  max_runtime_secs = 60,           # Maximum runtime (in seconds)
+  exclude_algos = c("DeepLearning", "GLM", "StackedEnsemble")  # Exclude non-tree-based models
+)
+
+# Extract the best model (one of the tree-based models)
+final_model <- automl@leader
+
+# Convert the test dataset to an H2O frame
+testing <- as.h2o(test)
+
+# Make predictions on the test data
+predictions <- predict(final_model, testing)
+
+# Display predictions
+head(predictions)
+```
+```{r}
+summary(final_model)
+```
+

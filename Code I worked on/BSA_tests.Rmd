@@ -1,0 +1,45 @@
+---
+title: "BSA Football Research Dist Fitting"
+author: "Naren Prakash"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(univariateML)
+```
+
+```{r}
+pbp_2018 <- read_csv("pbp_merged_2018.csv")
+pbp_2019 <- read_csv("pbp_merged_2019.csv")
+pbp_2020 <- read_csv("pbp_merged_2020.csv")
+pbp_2021 <- read_csv("pbp_merged_2021.csv")
+pbp_2022 <- read_csv("pbp_merged_2022.csv")
+pbp_2023 <- read_csv("pbp_merged_2023.csv")
+
+pbp_models <- list(pbp_2018, pbp_2019, pbp_2020, pbp_2021, pbp_2022, pbp_2023)
+```
+```{r}
+sub_1 <- drop_na(data.frame(bind_rows(pbp_models[1])$epa))
+sub_2 <- drop_na(data.frame(bind_rows(pbp_models[1:2])$epa))
+sub_3 <- drop_na(data.frame(bind_rows(pbp_models[1:3])$epa))
+sub_4 <- drop_na(data.frame(bind_rows(pbp_models[1:4])$epa))
+sub_5 <- drop_na(data.frame(bind_rows(pbp_models[1:5])$epa))
+```
+
+```{r}
+print(model_select(unlist(sub_1)))
+print(model_select(unlist(sub_2)))
+print(model_select(unlist(sub_3)))
+print(model_select(unlist(sub_4)))
+print(model_select(unlist(sub_5)))
+```
+```{r}
+print(model_select(pbp_2023$epa))
+```
+```{r}
+
+```
+
